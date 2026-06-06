@@ -297,7 +297,14 @@ export function refreshStatsCache(db: Database, force = false): void {
 // intelligence_rank = CEIL(100 - AA_score) from migrateModelsV24ReRank,
 // so this inverts it to recover the actual Artificial Analysis Intelligence
 // Index value (0-100 scale). Higher = smarter.
+//
+// Guard: intelligence_rank = 0 means the model was never ranked (not in the
+// V24 AA migration). Without this guard, 100 - 0 = 100 would make unranked
+// models appear as the smartest in the chain. We floor them at 1 (the lowest
+// meaningful score) so they don't hijack routing and the bandit can still
+// sample them occasionally for discovery.
 function intelligenceComposite(_sizeLabel: string, intelligenceRank: number): number {
+  if (intelligenceRank <= 0) return 1;
   return 100 - intelligenceRank;
 }
 
