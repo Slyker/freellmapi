@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/index.js';
-import { getAllPenalties, getCustomWeights, getRoutingScores, getRoutingStrategy, setCustomWeights, setRoutingStrategy } from '../services/router.js';
+import { getAllPenalties, getCustomWeights, getRoutingScores, getRoutingStrategy, setCustomWeights, setRoutingStrategy, getReasoningLevel, setReasoningLevel, type ReasoningLevel } from '../services/router.js';
 import { BANDIT_PRESETS, type RoutingStrategy } from '../services/scoring.js';
 import { parseBudget } from '../lib/budget.js';
 import { syncCapabilitiesDetailed } from '../services/capabilities.js';
@@ -54,7 +54,7 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.speed_rank, m.size_label, m.rpm_limit, m.rpd_limit,
            m.monthly_token_budget, m.supports_vision, m.supports_tools, m.supports_reasoning,
-           m.context_window
+           m.context_window, m.reasoning_rank, m.reasoning_tier
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id
     ORDER BY fc.priority ASC
@@ -85,6 +85,8 @@ fallbackRouter.get('/', (_req: Request, res: Response) => {
       modelId: r.model_id,
       displayName: r.display_name,
       intelligenceRank: r.intelligence_rank,
+      reasoningRank: r.reasoning_rank,
+      reasoningTier: r.reasoning_tier,
       speedRank: r.speed_rank,
       sizeLabel: r.size_label,
       rpmLimit: r.rpm_limit,
@@ -164,6 +166,27 @@ fallbackRouter.post('/sort/:preset', (req: Request, res: Response) => {
   reorder();
 
   res.json({ success: true, preset });
+});
+
+// ── Reasoning level selector ───────────────────────────────────────────────
+// GET /reasoning-mode → current reasoning level ('off' | 'low' | 'medium' | 'high')
+// PUT /reasoning-mode → set reasoning level
+fallbackRouter.get('/reasoning-mode', (_req: Request, res: Response) => {
+  res.json({ reasoningLevel: getReasoningLevel() });
+});
+
+const reasoningLevelSchema = z.object({
+  reasoningLevel: z.enum(['off', 'low', 'medium', 'high']),
+});
+
+fallbackRouter.put('/reasoning-mode', (req: Request, res: Response) => {
+  const parsed = reasoningLevelSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: { message: 'reasoningLevel must be "off", "low", "medium", or "high"' } });
+    return;
+  }
+  setReasoningLevel(parsed.data.reasoningLevel as ReasoningLevel);
+  res.json({ reasoningLevel: getReasoningLevel() });
 });
 
 // Force re-sync capabilities from OpenRouter API.

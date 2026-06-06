@@ -161,8 +161,53 @@ export const MODEL_PRICING: PricingRow[] = [
   ['openrouter', 'deepseek/deepseek-v3.1:free', 0.21, 0.79],
   ['openrouter', 'moonshotai/kimi-k2:free', 0.57, 2.30],
 
-  // Pollinations (serves gpt-oss-20b)
-  ['pollinations', 'openai-fast', 0.029, 0.14],
+  // Pollinations — aggregated models priced at their upstream equivalents.
+  // OpenAI family (GPT-5.x via Azure)
+  ['pollinations', 'openai-fast', 0.10, 0.40],
+  ['pollinations', 'openai', 0.40, 1.60],
+  ['pollinations', 'openai-large', 2.00, 8.00],
+  ['pollinations', 'gpt-5.4-mini', 0.40, 1.60],
+  ['pollinations', 'gpt-5.5', 2.50, 10.00],
+  // DeepSeek
+  ['pollinations', 'deepseek', 0.098, 0.197],
+  ['pollinations', 'deepseek-pro', 0.435, 0.87],
+  // Grok
+  ['pollinations', 'grok', 0.50, 1.50],
+  ['pollinations', 'grok-large', 2.00, 10.00],
+  ['pollinations', 'grok-4.3', 2.00, 10.00],
+  // Qwen
+  ['pollinations', 'qwen-coder', 0.09, 0.45],
+  ['pollinations', 'qwen-large', 0.90, 1.80],
+  ['pollinations', 'qwen-vision', 0.09, 0.45],
+  ['pollinations', 'qwen-vision-pro', 0.45, 1.80],
+  // Mistral
+  ['pollinations', 'mistral', 0.10, 0.30],
+  ['pollinations', 'mistral-4', 0.15, 0.60],
+  ['pollinations', 'mistral-large', 0.50, 1.50],
+  // Google Gemma
+  ['pollinations', 'gemma', 0.06, 0.33],
+  // Kimi / Moonshot
+  ['pollinations', 'kimi', 0.684, 3.42],
+  ['pollinations', 'kimi-k2.6', 0.684, 3.42],
+  // MiniMax
+  ['pollinations', 'minimax', 0.279, 1.20],
+  ['pollinations', 'minimax-m3', 0.50, 2.00],
+  // StepFun
+  ['pollinations', 'step-flash', 0.20, 1.15],
+  ['pollinations', 'step-3.5-flash', 0.20, 1.15],
+  // GLM / Zhipu
+  ['pollinations', 'glm', 0.98, 3.08],
+  // Meta Llama
+  ['pollinations', 'llama', 0.10, 0.32],
+  ['pollinations', 'llama-scout', 0.08, 0.30],
+  // Amazon Nova
+  ['pollinations', 'nova', 0.80, 3.20],
+  ['pollinations', 'nova-fast', 0.04, 0.16],
+  // Perplexity
+  ['pollinations', 'perplexity', 0.60, 1.80],
+  ['pollinations', 'perplexity-fast', 0.20, 0.60],
+  ['pollinations', 'perplexity-deep', 0.20, 0.60],
+  ['pollinations', 'perplexity-reasoning', 0.20, 0.60],
 
   // SambaNova
   ['sambanova', 'DeepSeek-V3.1', 0.21, 0.79],

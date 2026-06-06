@@ -312,8 +312,42 @@ const PLATFORM_MODEL_SPECS: Record<string, { context_window?: number; supports_v
   'ollama|gemma4:31b':              { context_window: 262144 },
 
   // ── Pollinations ────────────────────────────────────────────────────
-  // Source: https://pollinations.ai — single anonymous model (GPT-OSS 20B)
-  'pollinations|openai-fast':       { context_window: 131072 },
+  // Source: https://gen.pollinations.ai/models (auth-gated, June 2026).
+  // Context windows from API metadata. tools/reasoning from API flags.
+  // Vision-capable models have input_modalities: ['text','image'].
+  'pollinations|openai-fast':       { context_window: 400000, supports_tools: true, supports_vision: true },
+  'pollinations|openai':            { context_window: 400000, supports_tools: true, supports_vision: true },
+  'pollinations|openai-large':      { context_window: 1050000, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|gpt-5.4-mini':      { context_window: 400000, supports_tools: true, supports_vision: true },
+  'pollinations|gpt-5.5':           { context_window: 1050000, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|qwen-coder':        { context_window: 262144, supports_tools: true },
+  'pollinations|mistral':           { context_window: 128000, supports_tools: true, supports_vision: true },
+  'pollinations|mistral-4':         { context_window: 262144, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|deepseek':          { context_window: 1048576, supports_tools: true, supports_reasoning: true },
+  'pollinations|gemma':             { context_window: 262144, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|deepseek-pro':      { context_window: 1048576, supports_tools: true, supports_reasoning: true },
+  'pollinations|grok':              { context_window: 262144, supports_tools: true, supports_vision: true },
+  'pollinations|grok-large':        { context_window: 262144, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|grok-4.3':          { context_window: 1048576, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|perplexity-fast':   { context_window: 128000 },
+  'pollinations|perplexity-deep':   { context_window: 128000 },
+  'pollinations|perplexity':        { context_window: 200000 },
+  'pollinations|perplexity-reasoning': { context_window: 128000, supports_reasoning: true },
+  'pollinations|kimi':              { context_window: 262000, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|kimi-k2.6':         { context_window: 262000, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|nova-fast':         { context_window: 128000, supports_tools: true },
+  'pollinations|nova':              { context_window: 1048576, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|glm':               { context_window: 198000, supports_tools: true, supports_reasoning: true },
+  'pollinations|llama':             { context_window: 131072, supports_tools: true },
+  'pollinations|llama-scout':       { context_window: 327680, supports_tools: true, supports_vision: true },
+  'pollinations|minimax':           { context_window: 200000, supports_tools: true, supports_reasoning: true },
+  'pollinations|minimax-m3':        { context_window: 1048576, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|mistral-large':     { context_window: 256000, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|qwen-large':        { context_window: 1048576, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|qwen-vision':       { context_window: 131072, supports_tools: true, supports_vision: true },
+  'pollinations|qwen-vision-pro':   { context_window: 262144, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|step-flash':        { context_window: 256000, supports_tools: true, supports_vision: true, supports_reasoning: true },
+  'pollinations|step-3.5-flash':    { context_window: 262144, supports_tools: true, supports_reasoning: true },
 
   // ── Cloudflare Workers AI ───────────────────────────────────────────
   // Source: https://developers.cloudflare.com/workers-ai/models/

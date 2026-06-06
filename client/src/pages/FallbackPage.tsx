@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ChevronDown, Copy, CopyCheck, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
+import { Brain, ChevronDown, Copy, CopyCheck, RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react'
 import { apiFetch } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
@@ -39,6 +39,8 @@ interface FallbackEntry {
   modelId: string
   displayName: string
   intelligenceRank: number
+  reasoningRank: number | null
+  reasoningTier: string | null
   speedRank: number
   sizeLabel: string
   rpmLimit: number | null
@@ -542,6 +544,38 @@ export default function FallbackPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] }),
   })
 
+  type ReasoningLevel = 'off' | 'low' | 'medium' | 'high'
+  const [reasoningLevel, setReasoningLevelState] = useState<ReasoningLevel>('off')
+
+  const { data: reasoningModeData } = useQuery<{ reasoningLevel: ReasoningLevel }>({
+    queryKey: ['fallback', 'reasoning-mode'],
+    queryFn: () => apiFetch('/api/fallback/reasoning-mode'),
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    if (reasoningModeData !== undefined) {
+      setReasoningLevelState(reasoningModeData.reasoningLevel)
+    }
+  }, [reasoningModeData?.reasoningLevel])
+
+  const reasoningLevelMutation = useMutation({
+    mutationFn: (level: ReasoningLevel) =>
+      apiFetch('/api/fallback/reasoning-mode', {
+        method: 'PUT',
+        body: JSON.stringify({ reasoningLevel: level }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['fallback', 'reasoning-mode'] })
+      queryClient.invalidateQueries({ queryKey: ['fallback', 'routing'] })
+    },
+  })
+
+  function handleReasoningLevelChange(level: ReasoningLevel) {
+    setReasoningLevelState(level)
+    reasoningLevelMutation.mutate(level)
+  }
+
   const syncMutation = useMutation({
     mutationFn: () => apiFetch('/api/fallback/sync-capabilities', { method: 'POST' }) as Promise<{ updated: number; unmatched: { platform: string; modelId: string; displayName: string }[]; total: number; matched: number; platformSynced: number; error?: string }>,
     onSuccess: (result) => {
@@ -648,7 +682,7 @@ export default function FallbackPage() {
           <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#3b82f6' }} />Speed</span>
         </th>
         <th className="py-2 pr-3 font-medium">
-          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />Intelligence</span>
+          <span className="inline-flex items-center gap-1"><span className="size-2 rounded-sm" style={{ background: '#a855f7' }} />Intelligence{reasoningLevel !== 'off' ? ` (${reasoningLevel})` : ''}</span>
         </th>
         <th className="py-2 pr-3 font-medium text-right tabular-nums">Context</th>
         <th className="py-2 pr-3 font-medium">
@@ -799,6 +833,27 @@ export default function FallbackPage() {
               <span className={`size-1.5 rounded-full ${reasoningOnly ? 'bg-emerald-600 dark:bg-emerald-400' : 'bg-muted-foreground/40'}`} />
               Reasoning
             </button>
+            {/* Reasoning level selector — interpolates between base and reasoning AA scores */}
+            <div className="ml-2 pl-2 border-l border-border">
+              <Select
+                value={reasoningLevel}
+                onValueChange={v => handleReasoningLevelChange(v as ReasoningLevel)}
+                disabled={reasoningLevelMutation.isPending}
+              >
+                <SelectTrigger size="sm" className="min-w-[120px]">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Brain className="size-3.5" />
+                    <SelectValue placeholder="Reasoning" />
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">Reasoning OFF</SelectItem>
+                  <SelectItem value="low">Reasoning Low</SelectItem>
+                  <SelectItem value="medium">Reasoning Medium</SelectItem>
+                  <SelectItem value="high">Reasoning High</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
             {/* Context window chips — multi-select with per-filter counts */}
             <div className="inline-flex items-center gap-1">

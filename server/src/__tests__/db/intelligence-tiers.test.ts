@@ -25,8 +25,11 @@ describe('intelligence tier audit (migrateModelsV17)', () => {
   }
 
   it('promotes frontier-class Gemini Flash models (AA 46–55) to Frontier', () => {
-    expect(tier('google', 'gemini-3.5-flash')).toBe('Frontier');
-    expect(tier('google', 'gemini-3-flash-preview')).toBe('Frontier');
+    expect(tier('google', 'gemini-3.5-flash')).toBe('Frontier');  // AA 55
+  });
+
+  it('promotes Gemini 3 Flash Preview to Frontier with reasoning (AA 46.4)', () => {
+    expect(tier('google', 'gemini-3-flash-preview')).toBe('Frontier');  // AA 46.4 (reasoning)
   });
 
   it('demotes over-tiered models down from Frontier', () => {
@@ -42,7 +45,7 @@ describe('intelligence tier audit (migrateModelsV17)', () => {
   });
 
   it('demotes lapped models down from Large', () => {
-    expect(tier('google', 'gemini-2.5-flash')).toBe('Medium');   // AA 21
+    expect(tier('google', 'gemini-2.5-flash')).toBe('Large');    // AA 27.0 (reasoning)
     expect(tier('github', 'gpt-4o')).toBe('Medium');             // AA 17
     expect(tier('cohere', 'command-a-03-2025')).toBe('Medium');  // AA 13
     expect(tier('ollama', 'devstral-2:123b')).toBe('Medium');    // AA 22

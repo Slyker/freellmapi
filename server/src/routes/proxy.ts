@@ -8,7 +8,7 @@ import { getProvider } from '../providers/index.js';
 import { recordRequest, recordTokens, setCooldown, getCooldownDurationForLimit, PAYMENT_REQUIRED_COOLDOWN_MS } from '../services/ratelimit.js';
 import { pruneRequestAnalytics } from '../services/request-retention.js';
 import { runEmbeddings, EmbeddingsError } from '../services/embeddings.js';
-import { getDb, getUnifiedApiKey } from '../db/index.js';
+import { getDb, getSetting, getUnifiedApiKey } from '../db/index.js';
 import { contentToString, messageHasImage, normalizeOutboundContent } from '../lib/content.js';
 import { repairToolArguments, toolSchemaMap } from '../lib/tool-args.js';
 import { isFreeImageModel } from './image-models.js';
@@ -307,6 +307,7 @@ const chatCompletionSchema = z.object({
   // Image generation fields — forwarded to OpenRouter as-is when present.
   modalities: z.array(z.string()).nullable().optional(),
   image_config: z.record(z.string(), z.unknown()).nullable().optional(),
+  reasoning_effort: z.enum(['low', 'medium', 'high']).nullable().optional(),
 });
 
 export function isRetryableError(err: any): boolean {
@@ -441,7 +442,9 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
     return;
   }
 
-  const { model: requestedModel, temperature, top_p, stream, modalities, image_config } = parsed.data;
+  const { model: requestedModel, temperature, top_p, stream, modalities, image_config, reasoning_effort: clientReasoningEffort } = parsed.data;
+  const storedLevel = getSetting('reasoning_level');
+  const effectiveReasoningEffort = clientReasoningEffort ?? (storedLevel && storedLevel !== 'off' ? storedLevel as 'low' | 'medium' | 'high' : undefined);
   // Agent-tolerant knob normalization (#200): max_tokens <= 0 means "no
   // limit" in several clients → unset; tool_choice 'any' is OpenAI's
   // 'required'; tool definitions get their 'function' type re-defaulted.
@@ -801,7 +804,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
         try {
           const gen = route.provider.streamChatCompletion(
             route.apiKey, messages, route.modelId,
-            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, modalities: modalities ?? undefined, image_config: image_config ?? undefined },
+            { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, modalities: modalities ?? undefined, image_config: image_config ?? undefined, reasoning_effort: effectiveReasoningEffort },
           );
 
           for await (const chunk of gen) {
@@ -971,7 +974,7 @@ proxyRouter.post('/chat/completions', async (req: Request, res: Response) => {
       } else {
         const result = await route.provider.chatCompletion(
           route.apiKey, messages, route.modelId,
-          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, modalities: modalities ?? undefined, image_config: image_config ?? undefined },
+          { temperature, max_tokens, top_p, tools, tool_choice, parallel_tool_calls, modalities: modalities ?? undefined, image_config: image_config ?? undefined, reasoning_effort: effectiveReasoningEffort },
         );
 
         // Empty completion (no text, no tool calls) → fail over rather than

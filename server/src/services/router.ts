@@ -40,6 +40,8 @@ interface ChainRow {
   supports_vision: number;
   supports_tools: number;
   context_window: number | null;
+  reasoning_rank: number | null;
+  reasoning_tier: string | null;
   // Custom models bind to the api_keys row carrying their endpoint (#212);
   // NULL for built-in platforms.
   key_id: number | null;
@@ -141,6 +143,48 @@ export function getAllPenalties(): Array<{ modelDbId: number; count: number; pen
 const STRATEGY_KEY = 'routing_strategy';
 const CUSTOM_WEIGHTS_KEY = 'routing_custom_weights';
 const VALID_STRATEGIES: RoutingStrategy[] = ['priority', 'balanced', 'smartest', 'fastest', 'reliable', 'custom'];
+
+// ── Reasoning level (persisted) ────────────────────────────────────────────
+// Controls how much the AA reasoning score influences intelligence routing:
+//   'off'    → use base AA score (0% reasoning influence)
+//   'low'    → 25% toward reasoning score
+//   'medium' → 50% toward reasoning score
+//   'high'   → 100% toward reasoning score (full AA reasoning data)
+// Models without AA reasoning data always use their base score regardless.
+const REASONING_LEVEL_KEY = 'reasoning_level';
+const VALID_LEVELS = ['off', 'low', 'medium', 'high'] as const;
+export type ReasoningLevel = typeof VALID_LEVELS[number];
+
+// Interpolation fractions per level (0 = base, 1 = reasoning).
+const REASONING_WEIGHTS: Record<ReasoningLevel, number> = {
+  off: 0,
+  low: 0.25,
+  medium: 0.5,
+  high: 1,
+};
+
+export function getReasoningLevel(): ReasoningLevel {
+  const raw = getSetting(REASONING_LEVEL_KEY);
+  if (raw && VALID_LEVELS.includes(raw as ReasoningLevel)) return raw as ReasoningLevel;
+  return 'off';
+}
+
+export function setReasoningLevel(level: ReasoningLevel): void {
+  if (!VALID_LEVELS.includes(level)) throw new Error(`Invalid reasoning level: ${level}`);
+  setSetting(REASONING_LEVEL_KEY, level);
+}
+
+/**
+ * Compute effective AA score by interpolating between base and reasoning scores.
+ * Returns raw AA score (0-100). Models without reasoning data use base score.
+ */
+function interpolateAA(baseRank: number, reasoningRank: number | null, level: ReasoningLevel): number {
+  const baseAA = 100 - baseRank;
+  if (reasoningRank == null || reasoningRank <= 0) return baseAA;
+  const reasoningAA = 100 - reasoningRank;
+  const w = REASONING_WEIGHTS[level];
+  return baseAA + w * (reasoningAA - baseAA);
+}
 
 export function getRoutingStrategy(): RoutingStrategy {
   const raw = getSetting(STRATEGY_KEY);
@@ -303,9 +347,14 @@ export function refreshStatsCache(db: Database, force = false): void {
 // models appear as the smartest in the chain. We floor them at 1 (the lowest
 // meaningful score) so they don't hijack routing and the bandit can still
 // sample them occasionally for discovery.
-function intelligenceComposite(_sizeLabel: string, intelligenceRank: number): number {
+function intelligenceComposite(
+  intelligenceRank: number,
+  reasoningRank: number | null,
+  level: ReasoningLevel,
+): number {
   if (intelligenceRank <= 0) return 1;
-  return 100 - intelligenceRank;
+  const aa = interpolateAA(intelligenceRank, reasoningRank, level);
+  return Math.max(aa, 1);
 }
 
 // Per-model axis values + the final score. `sampled` chooses Thompson sampling
@@ -323,6 +372,7 @@ function scoreChainEntry(
   intelMin: number,
   intelMax: number,
   sampled: boolean,
+  reasoningLevel: ReasoningLevel,
 ): ScoredEntry {
   const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
   const successes = stats?.successes ?? 0;
@@ -338,7 +388,7 @@ function scoreChainEntry(
 
   const speed = speedScore(stats?.tokPerSec ?? 0, stats?.avgTtfbMs ?? null);
   const intelligence = intelligenceScore(
-    intelligenceComposite(entry.size_label, entry.intelligence_rank), intelMin, intelMax,
+    intelligenceComposite(entry.intelligence_rank, entry.reasoning_rank, reasoningLevel), intelMin, intelMax,
   );
 
   const budget = parseBudget(entry.monthly_token_budget);
@@ -365,15 +415,13 @@ function orderChain(chain: ChainRow[], strategy: RoutingStrategy): ChainRow[] {
       .map(x => x.e);
   }
 
-  const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
-  // Use fixed [0, 100] range — AA scores are naturally 0-100, so this gives
-  // each model its true intelligence percentile without compressing same-tier
-  // models together (which happened with tier*1000 - rank).
+  // Use fixed [0, 100] range — AA scores are naturally 0-100.
+  const reasoningLevel = getReasoningLevel();
   const intelMin = 0;
   const intelMax = 100;
 
   return chain
-    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, true).score }))
+    .map(e => ({ e, s: scoreChainEntry(e, weights, intelMin, intelMax, true, reasoningLevel).score }))
     // Higher score first; manual priority breaks ties so the chain still matters.
     .sort((a, b) => b.s - a.s || a.e.priority - b.e.priority)
     .map(x => x.e);
@@ -407,7 +455,8 @@ export function routeRequest(estimatedTokens = 1000, skipKeys?: Set<string>, pre
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window, m.key_id
+           m.supports_tools, m.context_window, m.key_id,
+           m.reasoning_rank, m.reasoning_tier
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id AND m.enabled = 1
     WHERE fc.enabled = 1
@@ -570,7 +619,8 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
            m.platform, m.model_id, m.display_name, m.intelligence_rank,
            m.size_label, m.monthly_token_budget,
            m.rpm_limit, m.rpd_limit, m.tpm_limit, m.tpd_limit, m.supports_vision,
-           m.supports_tools, m.context_window
+           m.supports_tools, m.context_window,
+           m.reasoning_rank, m.reasoning_tier
     FROM fallback_config fc
     JOIN models m ON m.id = fc.model_db_id
     WHERE m.enabled = 1
@@ -579,13 +629,13 @@ export function getRoutingScores(): { strategy: RoutingStrategy; weights: Routin
   // For display we score under 'balanced' weights when in priority mode, so the
   // table still shows a meaningful ranking even with the bandit turned off.
   const weights = weightsFor(strategy) ?? BANDIT_PRESETS.balanced;
-  const composites = chain.map(e => intelligenceComposite(e.size_label, e.intelligence_rank));
   // Fixed [0, 100] range — AA scores are naturally 0-100.
+  const reasoningLevel = getReasoningLevel();
   const intelMin = 0;
   const intelMax = 100;
 
   const scores: RoutingScore[] = chain.map(entry => {
-    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false);
+    const scored = scoreChainEntry(entry, weights, intelMin, intelMax, false, reasoningLevel);
     const stats = statsCache?.get(`${entry.platform}:${entry.model_id}`);
     return {
       modelDbId: entry.model_db_id,

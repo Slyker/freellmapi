@@ -1,0 +1,822 @@
+[
+  {
+    "model": "Claude Opus 4.8 (max)",
+    "intelligence": 61
+  },
+  {
+    "model": "GPT-5.5 (xhigh)",
+    "intelligence": 60
+  },
+  {
+    "model": "GPT-5.5 (high)",
+    "intelligence": 59
+  },
+  {
+    "model": "Claude Opus 4.7 (max)",
+    "intelligence": 57
+  },
+  {
+    "model": "Gemini 3.1 Pro Preview",
+    "intelligence": 57
+  },
+  {
+    "model": "GPT-5.5 (medium)",
+    "intelligence": 57
+  },
+  {
+    "model": "Qwen3.7 Max",
+    "intelligence": 57
+  },
+  {
+    "model": "Gemini 3.5 Flash",
+    "intelligence": 55
+  },
+  {
+    "model": "Gemini 3.5 Flash (medium)",
+    "intelligence": 55
+  },
+  {
+    "model": "MiniMax-M3",
+    "intelligence": 55
+  },
+  {
+    "model": "Kimi K2.6",
+    "intelligence": 54
+  },
+  {
+    "model": "MiMo-V2.5-Pro",
+    "intelligence": 54
+  },
+  {
+    "model": "GPT-5.3 Codex (xhigh)",
+    "intelligence": 54
+  },
+  {
+    "model": "Qwen3.7 Plus",
+    "intelligence": 53
+  },
+  {
+    "model": "Grok 4.3 (high)",
+    "intelligence": 53
+  },
+  {
+    "model": "Muse Spark",
+    "intelligence": 52
+  },
+  {
+    "model": "Claude Opus 4.7 (Non-reasoning, high)",
+    "intelligence": 52
+  },
+  {
+    "model": "Claude Sonnet 4.6 (max)",
+    "intelligence": 52
+  },
+  {
+    "model": "DeepSeek V4 Pro (Max)",
+    "intelligence": 52
+  },
+  {
+    "model": "GLM-5.1",
+    "intelligence": 51
+  },
+  {
+    "model": "GPT-5.5 (low)",
+    "intelligence": 51
+  },
+  {
+    "model": "Qwen3.6 Plus",
+    "intelligence": 50
+  },
+  {
+    "model": "DeepSeek V4 Pro (High)",
+    "intelligence": 50
+  },
+  {
+    "model": "MiniMax-M2.7",
+    "intelligence": 50
+  },
+  {
+    "model": "MiMo-V2.5",
+    "intelligence": 49
+  },
+  {
+    "model": "GPT-5.4 mini (xhigh)",
+    "intelligence": 49
+  },
+  {
+    "model": "Grok 4.3 (medium)",
+    "intelligence": 49
+  },
+  {
+    "model": "Nemotron 3 Ultra",
+    "intelligence": 48
+  },
+  {
+    "model": "GLM-5-Turbo",
+    "intelligence": 47
+  },
+  {
+    "model": "DeepSeek V4 Flash (Max)",
+    "intelligence": 47
+  },
+  {
+    "model": "DeepSeek V4 Flash (High)",
+    "intelligence": 46
+  },
+  {
+    "model": "Qwen3.6 27B",
+    "intelligence": 46
+  },
+  {
+    "model": "Qwen3.5 397B A17B",
+    "intelligence": 45
+  },
+  {
+    "model": "MiMo-V2-Omni-0327",
+    "intelligence": 45
+  },
+  {
+    "model": "Claude Sonnet 4.6 (Non-reasoning)",
+    "intelligence": 44
+  },
+  {
+    "model": "GPT-5.4 nano (xhigh)",
+    "intelligence": 44
+  },
+  {
+    "model": "GLM-5.1",
+    "intelligence": 44
+  },
+  {
+    "model": "Qwen3.6 35B A3B",
+    "intelligence": 43
+  },
+  {
+    "model": "MiMo-V2-Omni",
+    "intelligence": 43
+  },
+  {
+    "model": "Gemini 3.5 Flash (minimal)",
+    "intelligence": 43
+  },
+  {
+    "model": "Kimi K2.6",
+    "intelligence": 43
+  },
+  {
+    "model": "GLM 5V Turbo",
+    "intelligence": 43
+  },
+  {
+    "model": "Claude Sonnet 4.6 (Non-reasoning, Low Effort)",
+    "intelligence": 43
+  },
+  {
+    "model": "Step 3.7 Flash",
+    "intelligence": 43
+  },
+  {
+    "model": "Hy3-preview",
+    "intelligence": 42
+  },
+  {
+    "model": "GPT-5.5 Instant (May 2026)",
+    "intelligence": 42
+  },
+  {
+    "model": "Qwen3.5 122B A10B",
+    "intelligence": 42
+  },
+  {
+    "model": "MiMo-V2-Flash (Feb 2026)",
+    "intelligence": 41
+  },
+  {
+    "model": "GPT-5.5 (Non-reasoning)",
+    "intelligence": 41
+  },
+  {
+    "model": "Qwen3.5 397B A17B",
+    "intelligence": 40
+  },
+  {
+    "model": "DeepSeek V4 Pro",
+    "intelligence": 39
+  },
+  {
+    "model": "Mistral Medium 3.5",
+    "intelligence": 39
+  },
+  {
+    "model": "Gemma 4 31B",
+    "intelligence": 39
+  },
+  {
+    "model": "Qwen3.5 Omni Plus",
+    "intelligence": 39
+  },
+  {
+    "model": "Step 3.5 Flash 2603",
+    "intelligence": 38
+  },
+  {
+    "model": "Ring-2.6-1T",
+    "intelligence": 38
+  },
+  {
+    "model": "o3",
+    "intelligence": 38
+  },
+  {
+    "model": "GPT-5.4 nano",
+    "intelligence": 38
+  },
+  {
+    "model": "GPT-5.4 mini (medium)",
+    "intelligence": 38
+  },
+  {
+    "model": "Command A+",
+    "intelligence": 37
+  },
+  {
+    "model": "Qwen3.6 27B",
+    "intelligence": 37
+  },
+  {
+    "model": "Claude 4.5 Haiku",
+    "intelligence": 37
+  },
+  {
+    "model": "DeepSeek V4 Flash",
+    "intelligence": 36
+  },
+  {
+    "model": "JT-35B-Flash",
+    "intelligence": 36
+  },
+  {
+    "model": "NVIDIA Nemotron 3 Super",
+    "intelligence": 36
+  },
+  {
+    "model": "Qwen3.5 122B A10B",
+    "intelligence": 36
+  },
+  {
+    "model": "Nova 2.0 Pro Preview (medium)",
+    "intelligence": 36
+  },
+  {
+    "model": "MiMo-V2.5-Pro",
+    "intelligence": 36
+  },
+  {
+    "model": "Gemini 2.5 Pro",
+    "intelligence": 35
+  },
+  {
+    "model": "Nova 2.0 Lite (high)",
+    "intelligence": 35
+  },
+  {
+    "model": "Hy3-preview",
+    "intelligence": 34
+  },
+  {
+    "model": "Ling-2.6-1T",
+    "intelligence": 34
+  },
+  {
+    "model": "Doubao Seed Code",
+    "intelligence": 34
+  },
+  {
+    "model": "Gemini 3.1 Flash-Lite",
+    "intelligence": 34
+  },
+  {
+    "model": "gpt-oss-120b (high)",
+    "intelligence": 33
+  },
+  {
+    "model": "Mercury 2",
+    "intelligence": 33
+  },
+  {
+    "model": "Qwen3.5 9B",
+    "intelligence": 32
+  },
+  {
+    "model": "Gemma 4 31B",
+    "intelligence": 32
+  },
+  {
+    "model": "K-EXAONE",
+    "intelligence": 32
+  },
+  {
+    "model": "Nova 2.0 Pro Preview (low)",
+    "intelligence": 32
+  },
+  {
+    "model": "Trinity Large Thinking",
+    "intelligence": 32
+  },
+  {
+    "model": "Qwen3.6 35B A3B",
+    "intelligence": 32
+  },
+  {
+    "model": "Gemma 4 26B A4B",
+    "intelligence": 31
+  },
+  {
+    "model": "Claude 4.5 Haiku",
+    "intelligence": 31
+  },
+  {
+    "model": "Grok 4.3 (Non-reasoning)",
+    "intelligence": 31
+  },
+  {
+    "model": "Qwen3.5 35B A3B",
+    "intelligence": 31
+  },
+  {
+    "model": "MiMo-V2-Flash",
+    "intelligence": 30
+  },
+  {
+    "model": "EXAONE 4.5 33B",
+    "intelligence": 30
+  },
+  {
+    "model": "Nova 2.0 Lite (medium)",
+    "intelligence": 30
+  },
+  {
+    "model": "ERNIE 5.0 Thinking Preview",
+    "intelligence": 29
+  },
+  {
+    "model": "Nemotron Cascade 2 30B A3B",
+    "intelligence": 28
+  },
+  {
+    "model": "Qwen3 Coder Next",
+    "intelligence": 28
+  },
+  {
+    "model": "Nova 2.0 Omni (medium)",
+    "intelligence": 28
+  },
+  {
+    "model": "Mistral Small 4",
+    "intelligence": 28
+  },
+  {
+    "model": "Qwen3.5 9B",
+    "intelligence": 27
+  },
+  {
+    "model": "Magistral Medium 1.2",
+    "intelligence": 27
+  },
+  {
+    "model": "Gemma 4 26B A4B",
+    "intelligence": 27
+  },
+  {
+    "model": "Qwen3.5 4B",
+    "intelligence": 27
+  },
+  {
+    "model": "Qwen3 Next 80B A3B",
+    "intelligence": 27
+  },
+  {
+    "model": "Ling 2.6 Flash",
+    "intelligence": 26
+  },
+  {
+    "model": "Solar Pro 3",
+    "intelligence": 26
+  },
+  {
+    "model": "Qwen3.5 Omni Flash",
+    "intelligence": 26
+  },
+  {
+    "model": "JT-MINI",
+    "intelligence": 25
+  },
+  {
+    "model": "Nova 2.0 Lite (low)",
+    "intelligence": 25
+  },
+  {
+    "model": "gpt-oss-20B (high)",
+    "intelligence": 24
+  },
+  {
+    "model": "gpt-oss-120b (low)",
+    "intelligence": 24
+  },
+  {
+    "model": "GPT-5.4 nano",
+    "intelligence": 24
+  },
+  {
+    "model": "NVIDIA Nemotron 3 Nano",
+    "intelligence": 24
+  },
+  {
+    "model": "LongCat Flash Lite",
+    "intelligence": 24
+  },
+  {
+    "model": "K-EXAONE",
+    "intelligence": 23
+  },
+  {
+    "model": "GPT-5.4 mini",
+    "intelligence": 23
+  },
+  {
+    "model": "Nova 2.0 Omni (low)",
+    "intelligence": 23
+  },
+  {
+    "model": "Nova 2.0 Pro Preview",
+    "intelligence": 23
+  },
+  {
+    "model": "Mi:dm K 2.5 Pro",
+    "intelligence": 23
+  },
+  {
+    "model": "Mistral Large 3",
+    "intelligence": 23
+  },
+  {
+    "model": "Qwen3.5 4B",
+    "intelligence": 23
+  },
+  {
+    "model": "INTELLECT-3",
+    "intelligence": 22
+  },
+  {
+    "model": "Devstral 2",
+    "intelligence": 22
+  },
+  {
+    "model": "Solar Open 100B",
+    "intelligence": 22
+  },
+  {
+    "model": "Nemotron 3 Nano Omni 30B A3B Reasoning",
+    "intelligence": 21
+  },
+  {
+    "model": "gpt-oss-20B (low)",
+    "intelligence": 21
+  },
+  {
+    "model": "Qwen3 Next 80B A3B",
+    "intelligence": 20
+  },
+  {
+    "model": "Devstral Small 2",
+    "intelligence": 19
+  },
+  {
+    "model": "Motif-2-12.7B",
+    "intelligence": 19
+  },
+  {
+    "model": "Nova Premier",
+    "intelligence": 19
+  },
+  {
+    "model": "Gemma 4 E4B",
+    "intelligence": 19
+  },
+  {
+    "model": "Llama Nemotron Super 49B v1.5",
+    "intelligence": 19
+  },
+  {
+    "model": "Mistral Small 4",
+    "intelligence": 19
+  },
+  {
+    "model": "Llama 4 Maverick",
+    "intelligence": 18
+  },
+  {
+    "model": "MiniCPM5-1B",
+    "intelligence": 18
+  },
+  {
+    "model": "Magistral Small 1.2",
+    "intelligence": 18
+  },
+  {
+    "model": "Sarvam 105B (high)",
+    "intelligence": 18
+  },
+  {
+    "model": "Nova 2.0 Lite",
+    "intelligence": 18
+  },
+  {
+    "model": "MiniCPM5-1B",
+    "intelligence": 18
+  },
+  {
+    "model": "Llama 3.1 405B",
+    "intelligence": 17
+  },
+  {
+    "model": "EXAONE 4.0 32B",
+    "intelligence": 17
+  },
+  {
+    "model": "Nova 2.0 Omni",
+    "intelligence": 17
+  },
+  {
+    "model": "Qwen3.5 2B",
+    "intelligence": 16
+  },
+  {
+    "model": "Nanbeige4.1-3B",
+    "intelligence": 16
+  },
+  {
+    "model": "Ministral 3 14B",
+    "intelligence": 16
+  },
+  {
+    "model": "Falcon-H1R-7B",
+    "intelligence": 16
+  },
+  {
+    "model": "Qwen3 Omni 30B A3B",
+    "intelligence": 16
+  },
+  {
+    "model": "Step3 VL 10B",
+    "intelligence": 15
+  },
+  {
+    "model": "Gemma 4 E2B",
+    "intelligence": 15
+  },
+  {
+    "model": "Llama Nemotron Ultra",
+    "intelligence": 15
+  },
+  {
+    "model": "ERNIE 4.5 300B A47B",
+    "intelligence": 15
+  },
+  {
+    "model": "Solar Pro 2",
+    "intelligence": 15
+  },
+  {
+    "model": "NVIDIA Nemotron Nano 12B v2 VL",
+    "intelligence": 15
+  },
+  {
+    "model": "Ministral 3 8B",
+    "intelligence": 15
+  },
+  {
+    "model": "Gemma 4 E4B",
+    "intelligence": 15
+  },
+  {
+    "model": "NVIDIA Nemotron Nano 9B V2",
+    "intelligence": 15
+  },
+  {
+    "model": "Granite 4.1 30B",
+    "intelligence": 15
+  },
+  {
+    "model": "NVIDIA Nemotron 3 Nano 4B",
+    "intelligence": 15
+  },
+  {
+    "model": "Qwen3.5 2B",
+    "intelligence": 15
+  },
+  {
+    "model": "Llama Nemotron Super 49B v1.5",
+    "intelligence": 15
+  },
+  {
+    "model": "Llama 3.3 70B",
+    "intelligence": 14
+  },
+  {
+    "model": "Kimi Linear 48B A3B Instruct",
+    "intelligence": 14
+  },
+  {
+    "model": "Ring-flash-2.0",
+    "intelligence": 14
+  },
+  {
+    "model": "Solar Pro 2",
+    "intelligence": 14
+  },
+  {
+    "model": "Llama 4 Scout",
+    "intelligence": 14
+  },
+  {
+    "model": "Command A",
+    "intelligence": 13
+  },
+  {
+    "model": "Llama 3.1 Nemotron 70B",
+    "intelligence": 13
+  },
+  {
+    "model": "NVIDIA Nemotron 3 Nano",
+    "intelligence": 13
+  },
+  {
+    "model": "NVIDIA Nemotron Nano 9B V2",
+    "intelligence": 13
+  },
+  {
+    "model": "MiniCPM-V 4.6 1.3B",
+    "intelligence": 13
+  },
+  {
+    "model": "Granite 4.1 8B",
+    "intelligence": 12
+  },
+  {
+    "model": "Sarvam 30B (high)",
+    "intelligence": 12
+  },
+  {
+    "model": "Gemma 4 E2B",
+    "intelligence": 12
+  },
+  {
+    "model": "R1 1776",
+    "intelligence": 12
+  },
+  {
+    "model": "Llama 3.2 90B (Vision)",
+    "intelligence": 12
+  },
+  {
+    "model": "EXAONE 4.0 32B",
+    "intelligence": 12
+  },
+  {
+    "model": "Ministral 3 3B",
+    "intelligence": 11
+  },
+  {
+    "model": "Jamba 1.7 Large",
+    "intelligence": 11
+  },
+  {
+    "model": "Granite 4.0 H Small",
+    "intelligence": 11
+  },
+  {
+    "model": "Qwen3 Omni 30B A3B",
+    "intelligence": 11
+  },
+  {
+    "model": "Qwen3.5 0.8B",
+    "intelligence": 11
+  },
+  {
+    "model": "LFM2 24B A2B",
+    "intelligence": 10
+  },
+  {
+    "model": "Phi-4",
+    "intelligence": 10
+  },
+  {
+    "model": "Nova Micro",
+    "intelligence": 10
+  },
+  {
+    "model": "NVIDIA Nemotron Nano 12B v2 VL",
+    "intelligence": 10
+  },
+  {
+    "model": "Phi-4 Multimodal",
+    "intelligence": 10
+  },
+  {
+    "model": "Qwen3.5 0.8B",
+    "intelligence": 10
+  },
+  {
+    "model": "Jamba Reasoning 3B",
+    "intelligence": 10
+  },
+  {
+    "model": "Reka Flash 3",
+    "intelligence": 10
+  },
+  {
+    "model": "Ling-mini-2.0",
+    "intelligence": 9
+  },
+  {
+    "model": "Llama 3.2 11B (Vision)",
+    "intelligence": 9
+  },
+  {
+    "model": "Granite 4.1 3B",
+    "intelligence": 9
+  },
+  {
+    "model": "Phi-4 Mini",
+    "intelligence": 8
+  },
+  {
+    "model": "Exaone 4.0 1.2B",
+    "intelligence": 8
+  },
+  {
+    "model": "Exaone 4.0 1.2B",
+    "intelligence": 8
+  },
+  {
+    "model": "LFM2.5-1.2B-Thinking",
+    "intelligence": 8
+  },
+  {
+    "model": "Jamba 1.7 Mini",
+    "intelligence": 8
+  },
+  {
+    "model": "LFM2 2.6B",
+    "intelligence": 8
+  },
+  {
+    "model": "LFM2.5-1.2B-Instruct",
+    "intelligence": 8
+  },
+  {
+    "model": "Granite 4.0 H 1B",
+    "intelligence": 8
+  },
+  {
+    "model": "Gemma 3 270M",
+    "intelligence": 8
+  },
+  {
+    "model": "Apertus 70B Instruct",
+    "intelligence": 8
+  },
+  {
+    "model": "Granite 4.0 Micro",
+    "intelligence": 8
+  },
+  {
+    "model": "Granite 4.0 1B",
+    "intelligence": 7
+  },
+  {
+    "model": "LFM2 8B A1B",
+    "intelligence": 7
+  },
+  {
+    "model": "LFM2.5-VL-1.6B",
+    "intelligence": 6
+  },
+  {
+    "model": "Granite 4.0 350M",
+    "intelligence": 6
+  },
+  {
+    "model": "Apertus 8B Instruct",
+    "intelligence": 6
+  },
+  {
+    "model": "Granite 4.0 H 350M",
+    "intelligence": 5
+  },
+  {
+    "model": "Tiny Aya Global",
+    "intelligence": 5
+  }
+]

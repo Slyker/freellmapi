@@ -18,6 +18,7 @@ export interface CompletionOptions {
   parallel_tool_calls?: boolean;
   modalities?: string[];
   image_config?: Record<string, unknown>;
+  reasoning_effort?: 'low' | 'medium' | 'high';
 }
 
 export abstract class BaseProvider {

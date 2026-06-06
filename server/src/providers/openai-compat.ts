@@ -71,6 +71,7 @@ export class OpenAICompatProvider extends BaseProvider {
         parallel_tool_calls: options?.parallel_tool_calls,
         ...(options?.modalities ? { modalities: options.modalities } : {}),
         ...(options?.image_config ? { image_config: options.image_config } : {}),
+        ...(options?.reasoning_effort ? { reasoning_effort: options.reasoning_effort } : {}),
       }),
     }, this.timeoutMs);
 
@@ -118,6 +119,7 @@ export class OpenAICompatProvider extends BaseProvider {
         stream: true,
         ...(options?.modalities ? { modalities: options.modalities } : {}),
         ...(options?.image_config ? { image_config: options.image_config } : {}),
+        ...(options?.reasoning_effort ? { reasoning_effort: options.reasoning_effort } : {}),
       }),
     }, this.timeoutMs);
 

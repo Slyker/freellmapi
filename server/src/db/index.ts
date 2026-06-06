@@ -62,6 +62,8 @@ export function initDb(dbPath?: string): Database.Database {
   migrateModelsV23OpenCodeFree(db);
   migrateModelsV24ReRank(db);
   migrateModelsV25Reasoning(db);
+  migrateModelsV26Pollinations(db);
+  migrateModelsV27ReasoningRanks(db);
   // After all model migrations: add/refresh paid-equivalent pricing
   // (drives the realistic "Est. savings" analytics stat).
   applyModelPricing(db);
@@ -96,6 +98,8 @@ function createTables(db: Database.Database) {
       supports_vision INTEGER NOT NULL DEFAULT 0,
       supports_tools INTEGER NOT NULL DEFAULT 0,
       supports_reasoning INTEGER NOT NULL DEFAULT 0,
+      reasoning_rank INTEGER,
+      reasoning_tier TEXT,
       UNIQUE(platform, model_id)
     );
 
@@ -428,7 +432,7 @@ function migrateModelsV2(db: Database.Database) {
   // inference. Revert to gpt-4o which works. This only runs if the gpt-5 row exists.
   db.prepare(`
     UPDATE models
-       SET model_id = 'gpt-4o', display_name = 'GPT-4o', intelligence_rank = 5,
+       SET model_id = 'gpt-4o', display_name = 'GPT-4o', intelligence_rank = 74,
            size_label = 'Large', context_window = 8000, monthly_token_budget = '~18M'
      WHERE platform = 'github' AND model_id = 'openai/gpt-5'
   `).run();
@@ -469,9 +473,9 @@ function migrateModelsV2(db: Database.Database) {
 }
 
 /**
- * Re-rank intelligence based on April 2026 coding + agentic tool-use benchmarks:
- * SWE-bench Verified, Terminal-Bench 2, TAU-Bench, Aider Polyglot.
- * Higher rank = weaker. Ties are allowed (same weights across providers).
+ * Re-rank intelligence based on Artificial Analysis Intelligence Index v4.0
+ * (June 2026). intelligence_rank = CEIL(100 - AA_score). Ties allowed.
+ * Tier bands: Frontier >= 45, Large 26-44, Medium 13-25, Small <= 12.
  */
 function migrateModelsV3Ranks(db: Database.Database) {
   const setRank = db.prepare(`UPDATE models SET intelligence_rank = ? WHERE platform = ? AND model_id = ?`);
@@ -1030,7 +1034,7 @@ function migrateModelsV11(db: Database.Database) {
 
     // Pollinations — anonymous /openai endpoint. Public model list returns
     // just one anonymous-tier entry. Tool calls supported per their metadata.
-    ['pollinations', 'openai-fast',                              'GPT-OSS 20B (Pollinations)',    18, 10, 'Medium',   null, null, null, null, '~? (anon)',      131072],
+    ['pollinations', 'openai-fast',                              'GPT-5 Nano (Pollinations)',     74, 10, 'Large',   null, null, null, null, '~? (anon)',      400000],
 
     // LLM7.io — 100 req/hr free (anonymous works). Probe-confirmed list:
     ['llm7',         'gpt-oss-20b',                              'GPT-OSS 20B (LLM7)',            18, 10, 'Medium',   100, null, null, null, '~2-3M (100/hr)', 131072],
@@ -1852,8 +1856,191 @@ function migrateEmbeddingsV1(db: Database.Database) {
   }
 }
 
+/**
+ * V27 (June 2026): Add reasoning_rank and reasoning_tier columns.
+ * These hold the Artificial Analysis Intelligence Index v4.0 reasoning-mode
+ * score — SEVERAL models score significantly higher when using chain-of-thought
+ * reasoning. The router uses these values instead of the standard
+ * intelligence_rank / size_label when the user enables the reasoning toggle in
+ * the dashboard.
+ *
+ * Models without AA reasoning data get NULL in both columns — the router falls
+ * back to the standard rank/tier when reasoning mode is on. Idempotent.
+ */
+function migrateModelsV27ReasoningRanks(db: Database.Database) {
+  const columns = db.prepare('PRAGMA table_info(models)').all() as { name: string }[];
+  if (!columns.some(col => col.name === 'reasoning_rank')) {
+    db.prepare('ALTER TABLE models ADD COLUMN reasoning_rank INTEGER').run();
+    db.prepare('ALTER TABLE models ADD COLUMN reasoning_tier TEXT').run();
+  }
+
+  const update = db.prepare(`
+    UPDATE models SET reasoning_rank = ?, reasoning_tier = ?
+     WHERE platform = ? AND model_id = ?
+  `);
+
+  const entries: Array<[number, string, string, string]> = [
+    // Google Gemini — all benefit from reasoning
+    [54, 'Frontier', 'google', 'gemini-3-flash-preview'],       // AA 35.0 -> 46.4 (+11.4)
+    [73, 'Large',    'google', 'gemini-2.5-flash'],              // AA 20.6 -> 27.0 (+6.4)
+    [83, 'Medium',   'google', 'gemini-2.5-flash-lite'],         // AA 12.7 -> 17.6 (+4.9)
+    [46, 'Frontier', 'google', 'gemini-3.5-flash'],              // AA 55.0 (stays Frontier)
+
+    // DeepSeek V3.2 — strong reasoning gain
+    [59, 'Large', 'sambanova', 'DeepSeek-V3.2'],                 // AA 32.1 -> 41.7 (+9.6)
+    [59, 'Large', 'ollama', 'deepseek-v3.2'],                    // Same via Ollama
+    [73, 'Large', 'sambanova', 'DeepSeek-V3.1'],                 // AA 28.1 -> 27.7 (-0.4)
+
+    // Nemotron 3 Nano — ~11 point gain
+    [76, 'Medium', 'nvidia', 'nvidia/nemotron-3-nano-30b-a3b'],  // AA 13.2 -> 24.3 (+11.1)
+    [76, 'Medium', 'openrouter', 'nvidia/nemotron-3-nano-30b-a3b:free'],
+    [86, 'Medium', 'openrouter', 'nvidia/nemotron-nano-9b-v2:free'],    // AA 13.2 -> 14.8 (+1.6)
+
+    // Llama 3.3 70B — across all providers (AA reasoning ~18)
+    [82, 'Medium', 'nvidia', 'meta/llama-3.3-70b-instruct'],
+    [82, 'Medium', 'groq', 'llama-3.3-70b-versatile'],
+    [82, 'Medium', 'sambanova', 'Meta-Llama-3.3-70B-Instruct'],
+    [82, 'Medium', 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free'],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const [rRank, rTier, platform, modelId] of entries) {
+      update.run(rRank, rTier, platform, modelId);
+    }
+  });
+  apply();
+}
+
+
 /** Append any models not yet in the fallback chain, lowest priority, ordered by
  * intelligence_rank. Shared by the recent model migrations (V18–V20). */
+
+// ── V26: Pollinations expanded catalog (2026-06-06) ──
+// The /gen.pollinations.ai/models endpoint (with auth key) returns 33+ text/chat
+// models, not just the single anonymous-tier openai-fast seeded in V11. This
+// migration adds all genuine text/chat models from the Pollinations catalog,
+// excluding music (midijourney), audio/speech (whisper, gpt-realtime, universal),
+// moderation (qwen-safety), and the polly assistant wrapper.
+//
+// Pollinations is an anonymous aggregator — no per-model rate limits are
+// published. Limits stay null; real throttling comes from Pollinations' own 429s.
+// Vision/tools/reasoning flags match the /models API metadata.
+function migrateModelsV26Pollinations(db: Database.Database) {
+  // 1) Update existing openai-fast to match current API (GPT-5 Nano, ctx 400K)
+  db.prepare(`
+    UPDATE models
+       SET display_name = 'GPT-5 Nano (Pollinations)',
+           context_window = 400000,
+           intelligence_rank = 74,
+           size_label = 'Large'
+     WHERE platform = 'pollinations' AND model_id = 'openai-fast'
+  `).run();
+
+  // 2) Insert new Pollinations text/chat models
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO models (platform, model_id, display_name, intelligence_rank, speed_rank, size_label, rpm_limit, rpd_limit, tpm_limit, tpd_limit, monthly_token_budget, context_window)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const additions: Array<[string, string, string, number, number, string, number | null, number | null, number | null, number | null, string, number | null]> = [
+    // ── Frontier (AA ≥ 45) ─────────────────────────────────────────────
+    ['pollinations', 'gpt-5.5',          'GPT-5.5 (Pollinations)',                       40, 9,  'Frontier', null, null, null, null, '~? (anon)', 1050000],
+    ['pollinations', 'openai-large',     'GPT-5.4 (Pollinations)',                       44, 9,  'Frontier', null, null, null, null, '~? (anon)', 1050000],
+    ['pollinations', 'grok-4.3',         'Grok 4.3 (Pollinations)',                      47, 9,  'Frontier', null, null, null, null, '~? (anon)', 1048576],
+    ['pollinations', 'deepseek-pro',     'DeepSeek V4 Pro (Pollinations)',                49, 9,  'Frontier', null, null, null, null, '~? (anon)', 1048576],
+    ['pollinations', 'qwen-large',       'Qwen3.6 Plus (Pollinations)',                  50, 9,  'Frontier', null, null, null, null, '~? (anon)', 1048576],
+    ['pollinations', 'kimi-k2.6',        'Kimi K2.6 (Pollinations)',                     47, 9,  'Frontier', null, null, null, null, '~? (anon)', 262000],
+    ['pollinations', 'minimax-m3',       'MiniMax M3 (Pollinations)',                    46, 9,  'Frontier', null, null, null, null, '~? (anon)', 1048576],
+    ['pollinations', 'grok-large',       'Grok 4.20 Reasoning (Pollinations)',           51, 9,  'Frontier', null, null, null, null, '~? (anon)', 262144],
+
+    // ── Large (AA 26–44) ──────────────────────────────────────────────
+    ['pollinations', 'deepseek',         'DeepSeek V4 Flash Lite (Pollinations)',         54, 9,  'Frontier',    null, null, null, null, '~? (anon)', 1048576],
+    ['pollinations', 'mistral-large',    'Mistral Large 3 (Pollinations)',              78, 9,  'Medium',    null, null, null, null, '~? (anon)', 256000],
+    ['pollinations', 'nova',             'Nova 2 Lite (Pollinations)',                   82, 9,  'Medium',    null, null, null, null, '~? (anon)', 1048576],
+    ['pollinations', 'glm',              'GLM-5.1 (Pollinations)',                       49, 9,  'Frontier',    null, null, null, null, '~? (anon)', 198000],
+    ['pollinations', 'kimi',             'Kimi K2.5 (Pollinations)',                     54, 9,  'Frontier',    null, null, null, null, '~? (anon)', 262000],
+    ['pollinations', 'gpt-5.4-mini',     'GPT-5.4 Mini (Pollinations)',                  52, 9,  'Frontier',    null, null, null, null, '~? (anon)', 400000],
+    ['pollinations', 'qwen-vision-pro',  'Qwen3 VL 235B Thinking (Pollinations)',        73, 9,  'Large',    null, null, null, null, '~? (anon)', 262144],
+
+    // ── Medium (AA 13–25) ─────────────────────────────────────────────
+    ['pollinations', 'mistral-4',        'Mistral Small 4 (Pollinations)',               73, 9,  'Large',   null, null, null, null, '~? (anon)', 262144],
+    ['pollinations', 'qwen-coder',       'Qwen3 Coder 30B (Pollinations)',              80, 9,  'Medium',   null, null, null, null, '~? (anon)', 262144],
+    ['pollinations', 'grok',             'Grok 4.20 Non-Reasoning (Pollinations)',       71, 9,  'Large',   null, null, null, null, '~? (anon)', 262144],
+    ['pollinations', 'openai',           'GPT-5.4 Nano (Pollinations)',                  56, 10, 'Large',   null, null, null, null, '~? (anon)', 400000],
+    ['pollinations', 'step-flash',       'StepFun 3.7 Flash (Pollinations)',             58, 9,  'Large',   null, null, null, null, '~? (anon)', 256000],
+    ['pollinations', 'gemma',            'Gemma 4 26B A4B (Pollinations)',               69, 10, 'Large',   null, null, null, null, '~? (anon)', 262144],
+    ['pollinations', 'minimax',          'MiniMax M2.7 (Pollinations)',                  51, 9,  'Frontier',   null, null, null, null, '~? (anon)', 200000],
+    ['pollinations', 'llama-scout',      'Llama 4 Scout (Pollinations)',                 87, 10, 'Medium',   null, null, null, null, '~? (anon)', 327680],
+    ['pollinations', 'qwen-vision',      'Qwen3 VL 30B (Pollinations)',                  84, 10, 'Medium',   null, null, null, null, '~? (anon)', 131072],
+    ['pollinations', 'mistral',          'Mistral Small 3.2 (Pollinations)',             85, 10, 'Medium',   null, null, null, null, '~? (anon)', 128000],
+    ['pollinations', 'step-3.5-flash',   'StepFun 3.5 Flash (Pollinations)',             62, 9,  'Large',   null, null, null, null, '~? (anon)', 262144],
+    ['pollinations', 'llama',            'Llama 3.3 70B (Pollinations)',                 86, 10, 'Medium',   null, null, null, null, '~? (anon)', 131072],
+
+    // ── Small (AA ≤ 12) ──────────────────────────────────────────────
+    ['pollinations', 'nova-fast',        'Nova Micro (Pollinations)',                     90, 10, 'Small',    null, null, null, null, '~? (anon)', 128000],
+    ['pollinations', 'perplexity',       'Perplexity Sonar Pro (Pollinations)',           85, 10, 'Medium',    null, null, null, null, '~? (anon)', 200000],
+    ['pollinations', 'perplexity-reasoning', 'Perplexity Sonar Reasoning (Pollinations)', 76, 10, 'Medium',   null, null, null, null, '~? (anon)', 128000],
+    ['pollinations', 'perplexity-fast',  'Perplexity Sonar Fast (Pollinations)',          85, 10, 'Medium',    null, null, null, null, '~? (anon)', 128000],
+    ['pollinations', 'perplexity-deep',  'Perplexity Sonar Deep (Pollinations)',          83, 10, 'Medium',    null, null, null, null, '~? (anon)', 128000],
+  ];
+
+  const apply = db.transaction(() => {
+    for (const a of additions) insert.run(...a);
+    backfillFallback(db);
+  });
+  apply();
+
+  // 3) Update existing Pollinations rows (INSERT OR IGNORE skips existing rows)
+  const updateExisting = db.prepare(`
+    UPDATE models
+       SET intelligence_rank = ?,
+           size_label = ?
+     WHERE platform = 'pollinations' AND model_id = ?
+  `);
+  const existingUpdates: Array<[number, string, string]> = [
+    // ── Frontier ──
+    [ 46, 'Frontier', 'minimax-m3'],
+    [ 50, 'Frontier', 'qwen-large'],
+    [ 51, 'Frontier', 'minimax'],
+    // ── Large ──
+    [ 57, 'Large', 'glm'],
+    [ 58, 'Large', 'kimi-k2.6'],
+    [ 58, 'Large', 'step-flash'],
+    [ 60, 'Large', 'gpt-5.5'],
+    [ 61, 'Large', 'deepseek-pro'],
+    [ 62, 'Large', 'step-3.5-flash'],
+    [ 63, 'Large', 'kimi'],
+    [ 64, 'Large', 'deepseek'],
+    [ 65, 'Large', 'openai-large'],
+    [ 69, 'Large', 'grok-4.3'],
+    [ 71, 'Large', 'grok-large'],
+    [ 71, 'Large', 'grok'],
+    [ 73, 'Large', 'qwen-vision-pro'],
+    [ 73, 'Large', 'mistral-4'],
+    [ 73, 'Large', 'gemma'],
+    // ── Medium ──
+    [ 76, 'Medium', 'openai'],
+    [ 76, 'Medium', 'perplexity-reasoning'],
+    [ 77, 'Medium', 'gpt-5.4-mini'],
+    [ 78, 'Medium', 'mistral-large'],
+    [ 80, 'Medium', 'qwen-coder'],
+    [ 82, 'Medium', 'nova'],
+    [ 83, 'Medium', 'perplexity-deep'],
+    [ 84, 'Medium', 'qwen-vision'],
+    [ 85, 'Medium', 'mistral'],
+    [ 85, 'Medium', 'perplexity'],
+    [ 85, 'Medium', 'perplexity-fast'],
+    [ 86, 'Medium', 'llama'],
+    [ 87, 'Medium', 'llama-scout'],
+    // ── Small ──
+    [ 90, 'Small', 'nova-fast'],
+  ];
+
+  const applyUpdates = db.transaction(() => {
+    for (const row of existingUpdates) updateExisting.run(...row);
+  });
+  applyUpdates();
+}
+
 function backfillFallback(db: Database.Database) {
   const missing = db.prepare(`
     SELECT m.id FROM models m
@@ -1933,127 +2120,130 @@ function migrateModelsV24ReRank(db: Database.Database) {
 
   // [size_label, intelligence_rank, platform, model_id]
   // Sorted by intelligence_rank ascending (best models first).
+  // [size_label, intelligence_rank, platform, model_id]
+  // Sorted by intelligence_rank ascending (best models first).
+  // Scores from Artificial Analysis Intelligence Index (June 2026).
+  // [size_label, intelligence_rank, platform, model_id]
+  // Sorted by intelligence_rank ascending (best models first).
+  // Scores from Artificial Analysis Intelligence Index (June 2026).
   const ranked: Array<[string, number, string, string]> = [
-    // ── Frontier (AA ≥ 45) ──
-    ['Frontier', 43, 'google',      'gemini-3.1-pro-preview'],          // AA 57 (disabled V13)
-    ['Frontier', 45, 'google',      'gemini-3.5-flash'],                // AA 55
-    ['Frontier', 45, 'opencode',    'minimax-m3-free'],                 // AA 55 (MiniMax-M3)
-    ['Frontier', 46, 'nvidia',      'moonshotai/kimi-k2.6'],            // AA 54 (Kimi K2.6)
-    ['Frontier', 46, 'cloudflare',  '@cf/moonshotai/kimi-k2.6'],
-    ['Frontier', 46, 'huggingface', 'moonshotai/Kimi-K2.6'],
-    ['Frontier', 49, 'nvidia',      'z-ai/glm-5.1'],                    // AA 51 (GLM-5.1)
-    ['Frontier', 50, 'nvidia',      'minimaxai/minimax-m2.7'],          // AA 50 (MiniMax-M2.7)
-    ['Frontier', 50, 'opencode',    'qwen3.6-plus-free'],               // AA 50 (Qwen3.6 Plus)
-    ['Frontier', 51, 'opencode',    'mimo-v2.5-free'],                  // AA 49 (MiMo-V2.5)
-    ['Frontier', 52, 'opencode',    'nemotron-3-ultra-free'],           // AA 48 (Nemotron 3 Ultra)
-    ['Frontier', 55, 'google',      'gemini-3-flash-preview'],          // AA 45 (as V17, keep Frontier)
+      // ── Frontier ──
+      ['Frontier',  43, 'google', 'gemini-3.1-pro-preview'],
+      ['Frontier',  45, 'google', 'gemini-3.5-flash'],
+      ['Frontier',  46, 'opencode', 'minimax-m3-free'],
+      ['Frontier',  47, 'nvidia', 'moonshotai/kimi-k2.6'],
+      ['Frontier',  47, 'cloudflare', '@cf/moonshotai/kimi-k2.6'],
+      ['Frontier',  47, 'huggingface', 'moonshotai/Kimi-K2.6'],
+      ['Frontier',  49, 'nvidia', 'deepseek-ai/deepseek-v4-pro'],
+      ['Frontier',  49, 'nvidia', 'z-ai/glm-5.1'],
+      ['Frontier',  50, 'opencode', 'qwen3.6-plus-free'],
+      ['Frontier',  51, 'opencode', 'mimo-v2.5-free'],
+      ['Frontier',  51, 'nvidia', 'minimaxai/minimax-m2.7'],
+      ['Frontier',  53, 'opencode', 'nemotron-3-ultra-free'],
+      ['Frontier',  54, 'opencode', 'deepseek-v4-flash-free'],
+      ['Frontier',  54, 'nvidia', 'deepseek-ai/deepseek-v4-flash'],
+      ['Frontier',  54, 'huggingface', 'deepseek-ai/DeepSeek-V4-Flash'],
+      // ── Large ──
+      ['Large',  57, 'cloudflare', '@cf/qwen/qwen3-30b-a3b-fp8'],
+      ['Large',  58, 'kilo', 'stepfun/step-3.7-flash:free'],
+      ['Large',  58, 'cerebras', 'zai-glm-4.7'],
+      ['Large',  58, 'ollama', 'glm-4.7'],
+      ['Large',  60, 'ollama', 'kimi-k2-thinking'],
+      ['Large',  61, 'google', 'gemma-4-31b-it'],
+      ['Large',  61, 'nvidia', 'google/gemma-4-31b-it'],
+      ['Large',  61, 'openrouter', 'google/gemma-4-31b-it:free'],
+      ['Large',  61, 'mistral', 'mistral-medium-latest'],
+      ['Large',  61, 'ollama', 'gemma4:31b'],
+      ['Large',  64, 'opencode', 'nemotron-3-super-free'],
+      ['Large',  64, 'nvidia', 'nvidia/nemotron-3-super-120b-a12b'],
+      ['Large',  64, 'cloudflare', '@cf/nvidia/nemotron-3-120b-a12b'],
+      ['Large',  64, 'kilo', 'nvidia/nemotron-3-super-120b-a12b:free'],
+      ['Large',  64, 'openrouter', 'nvidia/nemotron-3-super-120b-a12b:free'],
+      ['Frontier', 54, 'google', 'gemini-3-flash-preview'],
+      ['Large',  66, 'google', 'gemini-2.5-pro'],
+      ['Large',  67, 'google', 'gemini-3.1-flash-lite-preview'],
+      ['Large',  67, 'cloudflare', '@cf/openai/gpt-oss-120b'],
+      ['Large',  67, 'openrouter', 'openai/gpt-oss-120b:free'],
+      ['Large',  67, 'cerebras', 'gpt-oss-120b'],
+      ['Large',  67, 'groq', 'openai/gpt-oss-120b'],
+      ['Large',  67, 'sambanova', 'gpt-oss-120b'],
+      ['Large',  67, 'ollama', 'gpt-oss:120b'],
+      ['Large', 59, 'sambanova', 'DeepSeek-V3.2'],
+      ['Large', 59, 'ollama', 'deepseek-v3.2'],
+      ['Large',  69, 'google', 'gemma-4-26b-a4b-it'],
+      ['Large',  69, 'cloudflare', '@cf/google/gemma-4-26b-a4b-it'],
+      ['Large',  69, 'openrouter', 'google/gemma-4-26b-a4b-it:free'],
+      ['Large',  70, 'cloudflare', '@cf/zai-org/glm-4.7-flash'],
+      ['Large',  70, 'zhipu', 'glm-4.7-flash'],
+      ['Large',  72, 'huggingface', 'Qwen/Qwen3-Coder-Next'],
+      ['Large',  72, 'ollama', 'qwen3-coder-next'],
+      ['Large',  73, 'mistral', 'mistral-small-latest'],
+      ['Large',  73, 'mistral', 'magistral-medium-latest'],
+      ['Large',  74, 'github', 'openai/gpt-4.1'],
+      ['Large',  74, 'pollinations', 'openai-fast'],
+      // ── Medium ──
+      ['Medium',  75, 'cerebras', 'qwen-3-235b-a22b-instruct-2507'],
+      ['Medium',  76, 'nvidia', 'qwen/qwen3-coder-480b-a35b-instruct'],
+      ['Medium',  76, 'openrouter', 'openai/gpt-oss-20b:free'],
+      ['Medium',  76, 'openrouter', 'qwen/qwen3-coder:free'],
+      ['Medium',  76, 'groq', 'openai/gpt-oss-20b'],
+      ['Medium',  76, 'ollama', 'gpt-oss:20b'],
+      ['Medium',  78, 'nvidia', 'mistralai/mistral-large-3-675b-instruct-2512'],
+      ['Medium',  78, 'mistral', 'mistral-large-latest'],
+      ['Medium',  78, 'mistral', 'devstral-latest'],
+      ['Medium',  78, 'ollama', 'mistral-large-3:675b'],
+      ['Medium',  78, 'ollama', 'devstral-2:123b'],
+      ['Medium',  79, 'openrouter', 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'],
+      ['Large', 73, 'google', 'gemini-2.5-flash'],
+      ['Medium',  80, 'openrouter', 'qwen/qwen3-next-80b-a3b-instruct:free'],
+      ['Medium',  82, 'nvidia', 'meta/llama-4-maverick-17b-128e-instruct'],
+      ['Medium',  82, 'sambanova', 'Llama-4-Maverick-17B-128E-Instruct'],
+      ['Medium',  82, 'github', 'gpt-4o'],
+      ['Medium',  83, 'cloudflare', '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'],
+      ['Medium',  83, 'openrouter', 'nousresearch/hermes-3-llama-3.1-405b:free'],
+      ['Medium',  86, 'cloudflare', '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
+      ['Medium',  86, 'openrouter', 'meta-llama/llama-3.3-70b-instruct:free'],
+      ['Medium',  86, 'mistral', 'ministral-8b-latest'],
+      ['Medium',  86, 'groq', 'llama-3.3-70b-versatile'],
+      ['Medium',  86, 'groq', 'qwen/qwen3-32b'],
+      ['Medium',  86, 'sambanova', 'Meta-Llama-3.3-70B-Instruct'],
+      ['Medium',  87, 'nvidia', 'nvidia/nemotron-3-nano-30b-a3b'],
+      ['Medium',  87, 'cloudflare', '@cf/meta/llama-4-scout-17b-16e-instruct'],
+      ['Medium',  87, 'openrouter', 'nvidia/nemotron-3-nano-30b-a3b:free'],
+      ['Medium',  87, 'openrouter', 'nvidia/nemotron-nano-9b-v2:free'],
+      ['Medium',  87, 'groq', 'meta-llama/llama-4-scout-17b-16e-instruct'],
+      ['Medium',  87, 'cohere', 'command-a-03-2025'],
+      // ── Small ──
+      ['Medium', 83, 'google', 'gemini-2.5-flash-lite'],
+      ['Small',  89, 'cerebras', 'llama3.1-8b'],
+      ['Small',  89, 'groq', 'llama-3.1-8b-instant'],
+      ['Small',  92, 'openrouter', 'liquid/lfm-2.5-1.2b-instruct:free'],
+      ['Small',  92, 'openrouter', 'liquid/lfm-2.5-1.2b-thinking:free'],
+      ['Small',  92, 'sambanova', 'gemma-3-12b-it'],
+      ['Small',  92, 'cohere', 'command-r-plus-08-2024'],
+      ['Small',  93, 'cohere', 'command-r-08-2024'],
 
-    // ── Large (AA 26–44) ──
-    ['Large',    57, 'cloudflare',  '@cf/qwen/qwen3-30b-a3b-fp8'],     // AA 43 (Qwen3.6 35B A3B)
-    ['Large',    57, 'kilo',        'stepfun/step-3.7-flash:free'],     // AA 43 (Step 3.7 Flash)
-    ['Large',    61, 'google',      'gemma-4-31b-it'],                  // AA 39 (Gemma 4 31B)
-    ['Large',    61, 'nvidia',      'google/gemma-4-31b-it'],
-    ['Large',    61, 'ollama',      'gemma4:31b'],
-    ['Large',    61, 'openrouter',  'google/gemma-4-31b-it:free'],
-    ['Large',    61, 'mistral',     'mistral-medium-latest'],           // AA 39 (Mistral Medium 3.5)
-    ['Large',    61, 'nvidia',      'deepseek-ai/deepseek-v4-pro'],     // AA 39 (DeepSeek V4 Pro)
-    ['Large',    64, 'nvidia',      'deepseek-ai/deepseek-v4-flash'],   // AA 36 (DeepSeek V4 Flash)
-    ['Large',    64, 'huggingface', 'deepseek-ai/DeepSeek-V4-Flash'],
-    ['Large',    64, 'opencode',    'deepseek-v4-flash-free'],
-    ['Large',    64, 'nvidia',      'nvidia/nemotron-3-super-120b-a12b'], // AA 36 (Nemotron 3 Super)
-    ['Large',    64, 'cloudflare',  '@cf/nvidia/nemotron-3-120b-a12b'],
-    ['Large',    64, 'openrouter',  'nvidia/nemotron-3-super-120b-a12b:free'],
-    ['Large',    64, 'kilo',        'nvidia/nemotron-3-super-120b-a12b:free'],
-    ['Large',    64, 'opencode',    'nemotron-3-super-free'],
-    ['Large',    65, 'google',      'gemini-2.5-pro'],                  // AA 35 (disabled V5)
-    ['Large',    66, 'google',      'gemini-3.1-flash-lite-preview'],   // AA 34
-    ['Large',    67, 'sambanova',   'gpt-oss-120b'],                    // AA 33 (gpt-oss-120b high)
-    ['Large',    67, 'groq',        'openai/gpt-oss-120b'],
-    ['Large',    67, 'cloudflare',  '@cf/openai/gpt-oss-120b'],
-    ['Large',    67, 'ollama',      'gpt-oss:120b'],
-    ['Large',    67, 'cerebras',    'gpt-oss-120b'],
-    ['Large',    67, 'openrouter',  'openai/gpt-oss-120b:free'],
-    ['Large',    69, 'google',      'gemma-4-26b-a4b-it'],              // AA 31 (Gemma 4 26B A4B)
-    ['Large',    69, 'cloudflare',  '@cf/google/gemma-4-26b-a4b-it'],
-    ['Large',    69, 'openrouter',  'google/gemma-4-26b-a4b-it:free'],
-    ['Large',    72, 'ollama',      'qwen3-coder-next'],                // AA 28 (Qwen3 Coder Next)
-    ['Large',    72, 'huggingface', 'Qwen/Qwen3-Coder-Next'],
-    ['Large',    72, 'sambanova',   'DeepSeek-V3.1'],                   // AA 28
-    ['Large',    72, 'mistral',     'mistral-small-latest'],            // AA 28 (Mistral Small 4)
-    ['Large',    73, 'openrouter',  'qwen/qwen3-next-80b-a3b-instruct:free'], // AA 27 (Qwen3 Next 80B A3B)
-    ['Large',    73, 'mistral',     'magistral-medium-latest'],         // AA 27 (Magistral Medium 1.2)
-
-    // ── Medium (AA 13–25) ──
-    ['Medium',   76, 'openrouter',  'openai/gpt-oss-20b:free'],         // AA 24 (gpt-oss-20B high)
-    ['Medium',   76, 'groq',        'openai/gpt-oss-20b'],
-    ['Medium',   76, 'groq',        'openai/gpt-oss-safeguard-20b'],
-    ['Medium',   76, 'ollama',      'gpt-oss:20b'],
-    ['Medium',   76, 'pollinations', 'openai-fast'],
-    ['Medium',   76, 'nvidia',      'nvidia/nemotron-3-nano-30b-a3b'],  // AA 24 (Nemotron 3 Nano)
-    ['Medium',   76, 'openrouter',  'nvidia/nemotron-3-nano-30b-a3b:free'],
-    ['Medium',   77, 'mistral',     'mistral-large-latest'],            // AA 23 (Mistral Large 3)
-    ['Medium',   77, 'nvidia',      'mistralai/mistral-large-3-675b-instruct-2512'],
-    ['Medium',   77, 'ollama',      'mistral-large-3:675b'],            // disabled V13
-    ['Medium',   77, 'openrouter',  'z-ai/glm-4.5-air:free'],           // AA 23 (GLM-4.5 Air)
-    ['Medium',   78, 'ollama',      'devstral-2:123b'],                  // AA 22 (Devstral 2)
-    ['Medium',   79, 'google',      'gemini-2.5-flash'],                // AA 21 (Gemini 2.5 Flash)
-    ['Medium',   79, 'openrouter',  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free'], // AA 21
-    ['Medium',   81, 'nvidia',      'meta/llama-4-maverick-17b-128e-instruct'], // AA 18 (Llama 4 Maverick)
-    ['Medium',   82, 'sambanova',   'Llama-4-Maverick-17B-128E-Instruct'],
-    ['Medium',   83, 'github',      'gpt-4o'],                           // AA 17
-    ['Medium',   83, 'cloudflare',  '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b'], // AA 17
-    ['Medium',   83, 'openrouter',  'nousresearch/hermes-3-llama-3.1-405b:free'], // AA 17 (Llama 3.1 405B)
-    ['Medium',   85, 'google',      'gemini-2.5-flash-lite'],           // AA 15 (Gemini 2.5 Flash-Lite estimated)
-    ['Medium',   85, 'openrouter',  'nvidia/nemotron-nano-9b-v2:free'], // AA 15 (Nemotron Nano 9B V2)
-    ['Medium',   85, 'mistral',     'ministral-8b-latest'],             // AA 15 (Ministral 3 8B)
-    ['Medium',   86, 'groq',        'llama-3.3-70b-versatile'],         // AA 14 (Llama 3.3 70B)
-    ['Medium',   86, 'sambanova',   'Meta-Llama-3.3-70B-Instruct'],
-    ['Medium',   86, 'cloudflare',  '@cf/meta/llama-3.3-70b-instruct-fp8-fast'],
-    ['Medium',   86, 'nvidia',      'meta/llama-3.3-70b-instruct'],
-    ['Medium',   86, 'openrouter',  'meta-llama/llama-3.3-70b-instruct:free'],
-    ['Medium',   86, 'groq',        'meta-llama/llama-4-scout-17b-16e-instruct'], // AA 14 (Llama 4 Scout)
-    ['Medium',   86, 'cloudflare',  '@cf/meta/llama-4-scout-17b-16e-instruct'],
-    ['Medium',   87, 'nvidia',      'meta/llama-3.1-70b-instruct'],     // AA 13 (Llama 3.1 Nemotron 70B)
-    ['Medium',   87, 'cohere',      'command-a-03-2025'],               // AA 13 (Command A)
-
-    // ── Small (AA ≤ 12) ──
-    ['Small',    92, 'mistral',     'codestral-latest'],                // AA 8 (Codestral)
-    ['Small',    92, 'llm7',        'codestral-latest'],
-    ['Small',    92, 'openrouter',  'liquid/lfm-2.5-1.2b-instruct:free'],  // AA 8 (LFM 2.5 1.2B)
-    ['Small',    92, 'openrouter',  'liquid/lfm-2.5-1.2b-thinking:free'],  // AA 8
-    ['Small',    95, 'cloudflare',  '@cf/ibm-granite/granite-4.0-h-micro'], // AA 5 (Granite 4.0 H 350M estimated)
-    ['Small',    95, 'groq',        'llama-3.1-8b-instant'],            // AA 5 (Llama 3.1 8B estimated)
-    ['Small',    95, 'cerebras',    'llama3.1-8b'],                     // disabled V14
-
-    // ── Models without AA scores — best-guess ranks ──
-    ['Medium',   75, 'nvidia',      'qwen/qwen3-coder-480b-a35b-instruct'], // Qwen3-Coder 480B
-    ['Large',    68, 'sambanova',   'DeepSeek-V3.2'],
-    ['Large',    70, 'cerebras',    'zai-glm-4.7'],                     // re-enabled V21
-    ['Large',    70, 'ollama',      'glm-4.7'],
-    ['Large',    74, 'github',      'openai/gpt-4.1'],
-    ['Large',    74, 'zhipu',       'glm-4.5-flash'],
-    ['Large',    74, 'cloudflare',  '@cf/zai-org/glm-4.7-flash'],
-    ['Large',    74, 'zhipu',       'glm-4.7-flash'],
-    ['Large',    75, 'opencode',    'big-pickle'],
-    ['Medium',   75, 'openrouter',  'qwen/qwen3-coder:free'],
-    ['Medium',   75, 'ollama',      'qwen3-coder:480b'],
-    ['Medium',   75, 'cerebras',    'qwen-3-235b-a22b-instruct-2507'],  // disabled V14
-    ['Large',    75, 'kilo',        'poolside/laguna-m.1:free'],
-    ['Large',    75, 'openrouter',  'poolside/laguna-m.1:free'],
-    ['Medium',   80, 'groq',        'groq/compound'],
-    ['Medium',   80, 'groq',        'groq/compound-mini'],
-    ['Medium',   85, 'groq',        'qwen/qwen3-32b'],
-    ['Medium',   88, 'kilo',        'poolside/laguna-xs.2:free'],
-    ['Medium',   88, 'openrouter',  'poolside/laguna-xs.2:free'],
-    ['Medium',   88, 'mistral',     'devstral-latest'],
-    ['Medium',   88, 'cohere',      'command-r-plus-08-2024'],
-    ['Small',    92, 'cohere',      'command-r-08-2024'],
-    ['Medium',   88, 'cohere',      'command-a-reasoning-08-2025'],
-    ['Small',    90, 'sambanova',   'gemma-3-12b-it'],
-    ['Large',    75, 'openrouter',  'openrouter/owl-alpha'],
-    ['Large',    75, 'ollama',      'cogito-2.1:671b'],
-    ['Large',    75, 'ollama',      'kimi-k2-thinking'],                // disabled V13
-    ['Large',    75, 'ollama',      'deepseek-v3.2'],                    // disabled V13
+      // ── Models without AA scores — best-guess ranks ──
+      ['Small',  92, 'mistral', 'codestral-latest'],
+      ['Small',  92, 'llm7', 'codestral-latest'],
+      ['Large',  75, 'kilo', 'poolside/laguna-m.1:free'],
+      ['Large',  75, 'openrouter', 'poolside/laguna-m.1:free'],
+      ['Medium',  88, 'kilo', 'poolside/laguna-xs.2:free'],
+      ['Medium',  88, 'openrouter', 'poolside/laguna-xs.2:free'],
+      ['Large',  75, 'openrouter', 'openrouter/owl-alpha'],
+      ['Large',  75, 'ollama', 'cogito-2.1:671b'],
+      // Models with AA scores from Artificial Analysis (June 2026)
+      ['Large',  72, 'sambanova', 'DeepSeek-V3.1'],
+      ['Medium',  77, 'openrouter', 'z-ai/glm-4.5-air:free'],
+      // Models without AA scores — best-guess ranks
+      ['Small',  90, 'nvidia', 'meta/llama-3.1-70b-instruct'],
+      ['Medium',  82, 'zhipu', 'glm-4.5-flash'],
+      // More models without AA scores — best-guess ranks
+      ['Medium', 76, 'ollama', 'qwen3-coder:480b'],
+      ['Large',  67, 'groq', 'groq/compound'],
+      ['Medium',  76, 'groq', 'groq/compound-mini'],
+      ['Medium',  86, 'nvidia', 'meta/llama-3.3-70b-instruct'],
+      ['Small',  93, 'cloudflare', '@cf/ibm-granite/granite-4.0-h-micro'],
   ];
 
   const apply = db.transaction(() => {
